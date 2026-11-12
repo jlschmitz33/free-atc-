@@ -120,8 +120,10 @@
 <div id="picker"><div id="pickerBox">
   <input id="aptSearch" placeholder="Search airport (e.g. KORD)">
   <div id="aptList"></div>
-  <div style="margin-top:14px;font-size:13px;color:var(--dim)">Custom LiveATC feed id (from the .pls link on liveatc.net):</div>
-  <div class="feedRow"><input id="customFeed" placeholder="e.g. kmsp_twr"><button class="chip sel" id="customGo">Play</button></div>
+  <div style="margin-top:14px;font-size:13px;color:var(--dim)">Add a feed: open "Find feeds", long-press a <b>Listen</b> link, Copy Link, paste here.</div>
+  <div class="feedRow"><input id="customFeed" placeholder="Paste LiveATC Listen link">
+    <select id="customKind" class="chip"><option>Tower</option><option>Ground</option><option>Approach</option><option>ATIS</option></select></div>
+  <div class="feedRow"><button class="chip sel" id="customGo">Save feed</button><button class="chip" id="clearFeeds">Clear this airport</button></div>
   <div style="margin-top:8px"><a id="findFeeds" target="_blank" style="color:#60a5fa;font-size:13px">Find feeds on LiveATC ↗</a></div>
 </div></div>
 
@@ -292,54 +294,28 @@ function updateFlightCard() {
   $('fRoute').href = `https://www.flightaware.com/live/flight/${cs}`;
 }
 
-/* ===== Radio ===== */
-const audio = $('audio');
+/* ===== Radio =====
+   Audio plays in LiveATC's own player (their terms prohibit third-party use of the streams).
+   Feeds are saved per airport on this phone. Add one by pasting a LiveATC "Listen" link. */
+const SEED_FEEDS = { KMSP: [{ kind: 'Approach', mount: 'kmsp1_app_134700' }] };
 let playing = false;
-const feedCache = {};      // ICAO -> [{mount, title, up, kind}]
 let feeds = [];
 
-/* Read the airport's real feed list from LiveATC (through vercel.json) */
-async function loadFeeds(code) {
-  if (feedCache[code]) return feedCache[code];
-  const out = [];
-  try {
-    const r = await fetch(`/lsearch?icao=${code}`);
-    const html = await r.text();
-    const re = /(?:\/play\/|mount=)([a-z0-9_]+)/gi;
-    const seenM = new Set(); let m;
-    while ((m = re.exec(html))) {
-      const mount = m[1].toLowerCase();
-      if (seenM.has(mount)) continue; seenM.add(mount);
-      const before = html.slice(Math.max(0, m.index - 3000), m.index);
-      const strongs = [...before.matchAll(/<strong>([^<]{3,80})<\/strong>/gi)];
-      const title = strongs.length ? strongs[strongs.length - 1][1].trim() : mount;
-      const statusM = [...before.matchAll(/Feed Status:[^A-Z]*(UP|DOWN)/gi)];
-      const up = statusM.length ? statusM[statusM.length - 1][1].toUpperCase() === 'UP' : true;
-      out.push({ mount, title, up, kind: kindOf(title) });
-    }
-  } catch (e) {}
-  feedCache[code] = out;
-  return out;
+function loadSaved() {
+  try { return JSON.parse(localStorage.getItem('freeatc_feeds')) || SEED_FEEDS; } catch (e) { return SEED_FEEDS; }
 }
-function kindOf(t) {
-  const k = [];
-  if (/gnd|ground|del|clnc|ramp/i.test(t)) k.push('Ground');
-  if (/twr|tower|ctaf/i.test(t)) k.push('Tower');
-  if (/app|dep|approach|tracon|final|center|ctr/i.test(t)) k.push('Approach');
-  if (/atis/i.test(t) && !k.length) k.push('ATIS');
-  return k;
-}
-function shortTitle(t) { return t.replace(new RegExp('^' + airport + '\\s*', 'i'), '').slice(0, 28) || t; }
+function saveAll(all) { try { localStorage.setItem('freeatc_feeds', JSON.stringify(all)); } catch (e) {} }
+function feedsFor(code) { return loadSaved()[code] || []; }
+
+function playerUrl(f) { return `https://www.liveatc.net/hlisten.php?mount=${encodeURIComponent(f.mount)}&icao=${airport.toLowerCase()}`; }
 
 function bestFeed(kind) {
-  const live = feeds.filter(f => f.up && !f.kind.includes('ATIS'));
-  const pool = live.length ? live : feeds;
-  return pool.find(f => f.kind.length === 1 && f.kind[0] === kind)
-      || pool.find(f => f.kind.includes(kind))
-      || pool.find(f => !f.kind.includes('ATIS')) || pool[0];
+  return feeds.find(f => f.kind === kind)
+      || (kind === 'Ground' && feeds.find(f => f.kind === 'Tower'))
+      || (kind === 'Tower' && feeds.find(f => f.kind === 'Approach'))
+      || feeds[0];
 }
 
-/* Pick the right channel type for the followed plane */
 function kindFor(a, code) {
   const ap = AIRPORTS[code];
   const alt = a.alt_baro === 'ground' ? 0 : (a.alt_baro ?? 99999);
@@ -368,47 +344,53 @@ async function autoTune() {
     kind = kindFor(p.a, airport);
   }
   const f = bestFeed(kind);
-  if (f) setFeed(f, true);
+  if (f) setFeed(f, true, kind);
+  else showNoFeeds();
 }
 
-function setFeed(f, isAuto) {
-  $('chanText').textContent = `${shortTitle(f.title)}${isAuto ? ' · Auto' : ''}`;
-  if (f.mount === currentFeed) return;
+function showNoFeeds() {
+  currentFeed = null;
+  $('chanText').textContent = `${airport} · no feeds saved`;
+  $('radioSub').textContent = 'Tap the airport name → Add feed';
+}
+
+function setFeed(f, isAuto, wantKind) {
+  const changed = currentFeed && f.mount !== currentFeed;
   currentFeed = f.mount;
-  if (playing) startAudio();
-  else $('radioSub').textContent = f.up ? 'Tap ▶ to listen' : 'Feed may be down';
+  $('chanText').textContent = `${airport} ${f.kind}${isAuto ? ' · Auto' : ''}`;
+  if (playing && changed) {
+    $('radioSub').textContent = `Plane moved to ${f.kind} — tap ▶ to switch`;
+    $('playBtn').classList.remove('on'); $('playBtn').textContent = '▶';
+  } else if (!playing) {
+    $('radioSub').textContent = wantKind && wantKind !== f.kind ? `No ${wantKind} feed saved — using ${f.kind}` : 'Tap ▶ to listen (opens LiveATC player)';
+  }
 }
 
 function startAudio() {
-  if (!currentFeed) return;
-  audio.src = `/atc/${currentFeed}?t=${Date.now()}`;
-  $('radioSub').textContent = 'Connecting…';
-  audio.play().then(() => {
-    playing = true; $('playBtn').classList.add('on'); $('playBtn').textContent = '❚❚'; $('liveDot').classList.add('on');
-    $('radioSub').textContent = `Live · ${currentFeed} · LiveATC.net`;
-  }).catch(() => { $('radioSub').textContent = `Couldn't play ${currentFeed} — pick another channel`; });
+  const f = feeds.find(x => x.mount === currentFeed);
+  if (!f) { $('picker').style.display = 'block'; renderAptList(''); return; }
+  window.open(playerUrl(f), 'liveatc');
+  playing = true;
+  $('playBtn').classList.add('on'); $('playBtn').textContent = '♪'; $('liveDot').classList.add('on');
+  $('radioSub').textContent = `Playing in LiveATC tab · ${f.mount}`;
 }
-function stopAudio() {
-  audio.pause(); audio.removeAttribute('src'); audio.load();
-  playing = false; $('playBtn').classList.remove('on'); $('playBtn').textContent = '▶'; $('liveDot').classList.remove('on');
-  $('radioSub').textContent = 'Tap ▶ to listen';
-}
-audio.onerror = () => { if (audio.getAttribute('src')) $('radioSub').textContent = `${currentFeed} offline — pick another channel`; };
-audio.onended = () => { if (playing) startAudio(); };   // reconnect if the stream drops
-$('playBtn').onclick = () => playing ? stopAudio() : startAudio();
+$('playBtn').onclick = startAudio;
 
 function renderChips() {
   const chips = $('chips'); chips.innerHTML = '';
   const add = (label, val, cls, f) => {
     const b = document.createElement('button');
     b.className = 'chip' + (cls ? ' ' + cls : '') + (channel === val ? ' sel' : '');
-    b.textContent = label + (f && !f.up ? ' (down)' : '');
+    b.textContent = label;
     b.onclick = () => { channel = val; renderChips(); if (val === 'auto') autoTune(); else setFeed(f, false); };
     chips.appendChild(b);
   };
   add('Auto', 'auto', 'auto');
-  for (const f of feeds.filter(f => !f.kind.includes('ATIS') || feeds.length < 4)) add(shortTitle(f.title), f.mount, '', f);
-  if (!feeds.length) { const s = document.createElement('span'); s.className = 'chip'; s.textContent = 'Loading feeds…'; chips.appendChild(s); }
+  for (const f of feeds) add(f.kind, f.mount, '', f);
+  const plus = document.createElement('button');
+  plus.className = 'chip'; plus.textContent = '+ Add feed';
+  plus.onclick = () => { renderAptList(''); $('picker').style.display = 'block'; $('customFeed').focus(); };
+  chips.appendChild(plus);
 }
 
 /* ===== Airport selection ===== */
@@ -417,12 +399,9 @@ async function selectAirport(code, fromAuto) {
   const ap = AIRPORTS[code];
   $('airportBtn').innerHTML = `${code}<small>${ap.name}</small>`;
   $('findFeeds').href = `https://www.liveatc.net/search/?icao=${code}`;
-  feeds = []; if (!fromAuto) channel = 'auto'; renderChips();
-  if (!fromAuto) { unfollow(); map.setView([ap.lat, ap.lon], 10); }
-  feeds = await loadFeeds(code);
-  if (airport !== code) return;
+  feeds = feedsFor(code);
+  if (!fromAuto) { channel = 'auto'; unfollow(); map.setView([ap.lat, ap.lon], 10); }
   renderChips();
-  if (!feeds.length) $('radioSub').textContent = 'No LiveATC feeds found for ' + code;
   if (!fromAuto) autoTune();
   try { localStorage.setItem('freeatc_airport', code); } catch (e) {}
 }
@@ -438,9 +417,20 @@ $('airportBtn').onclick = () => { renderAptList(''); $('aptSearch').value = ''; 
 $('picker').onclick = e => { if (e.target.id === 'picker') $('picker').style.display = 'none'; };
 $('aptSearch').oninput = e => renderAptList(e.target.value);
 $('customGo').onclick = () => {
-  const id = $('customFeed').value.trim(); if (!id) return;
-  channel = 'custom'; renderChips(); currentFeed = null; setFeed({ mount: id, title: id, up: true, kind: [] }, false); $('picker').style.display = 'none'; startAudio();
+  const txt = $('customFeed').value.trim(); if (!txt) return;
+  const m = txt.match(/mount=([a-z0-9_]+)/i) || txt.match(/\/play\/([a-z0-9_]+)\.pls/i) || txt.match(/^([a-z0-9_]+)$/i);
+  if (!m) { $('customFeed').value = ''; $('customFeed').placeholder = "Couldn't read that link — try again"; return; }
+  const icaoM = txt.match(/icao=([a-z0-9]{3,4})/i);
+  const code = icaoM && AIRPORTS[icaoM[1].toUpperCase()] ? icaoM[1].toUpperCase() : airport;
+  const all = loadSaved();
+  all[code] = (all[code] || []).filter(f => f.mount !== m[1].toLowerCase());
+  all[code].push({ kind: $('customKind').value, mount: m[1].toLowerCase() });
+  saveAll(all);
+  $('customFeed').value = '';
+  $('picker').style.display = 'none';
+  selectAirport(code);
 };
+$('clearFeeds').onclick = () => { const all = loadSaved(); delete all[airport]; saveAll(all); selectAirport(airport); $('picker').style.display = 'none'; };
 
 /* ===== Start ===== */
 let saved; try { saved = localStorage.getItem('freeatc_airport'); } catch (e) {}
