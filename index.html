@@ -128,28 +128,28 @@
 <script>
 /* ===== Airports & LiveATC feed ids ===== */
 const AIRPORTS = {
-  KMSP: { name: 'Minneapolis–St Paul', lat: 44.882, lon: -93.222, feeds: { Tower: 'kmsp_twr', Ground: 'kmsp_gnd', Approach: 'kmsp_app' } },
-  KDSM: { name: 'Des Moines', lat: 41.534, lon: -93.663, feeds: { Tower: 'kdsm_twr', Approach: 'kdsm_app' } },
-  KORD: { name: 'Chicago O\'Hare', lat: 41.978, lon: -87.904, feeds: { Tower: 'kord_twr', Ground: 'kord_gnd', Approach: 'kord_app' } },
-  KMDW: { name: 'Chicago Midway', lat: 41.786, lon: -87.752, feeds: { Tower: 'kmdw_twr', Approach: 'kmdw_app' } },
-  KOMA: { name: 'Omaha', lat: 41.303, lon: -95.894, feeds: { Tower: 'koma_twr', Approach: 'koma_app' } },
-  KMKE: { name: 'Milwaukee', lat: 42.947, lon: -87.897, feeds: { Tower: 'kmke_twr', Approach: 'kmke_app' } },
-  KFSD: { name: 'Sioux Falls', lat: 43.582, lon: -96.742, feeds: { Tower: 'kfsd_twr', Approach: 'kfsd_app' } },
-  KMCI: { name: 'Kansas City', lat: 39.298, lon: -94.714, feeds: { Tower: 'kmci_twr', Approach: 'kmci_app' } },
-  KSTL: { name: 'St. Louis', lat: 38.749, lon: -90.370, feeds: { Tower: 'kstl_twr', Approach: 'kstl_app' } },
-  KDFW: { name: 'Dallas/Fort Worth', lat: 32.897, lon: -97.038, feeds: { Tower: 'kdfw_twr', Ground: 'kdfw_gnd', Approach: 'kdfw_app' } },
-  KDEN: { name: 'Denver', lat: 39.856, lon: -104.674, feeds: { Tower: 'kden_twr', Ground: 'kden_gnd', Approach: 'kden_app' } },
-  KATL: { name: 'Atlanta', lat: 33.637, lon: -84.428, feeds: { Tower: 'katl_twr', Ground: 'katl_gnd', Approach: 'katl_app' } },
-  KJFK: { name: 'New York JFK', lat: 40.641, lon: -73.778, feeds: { Tower: 'kjfk_twr', Ground: 'kjfk_gnd', Approach: 'kjfk_app' } },
-  KLGA: { name: 'New York LaGuardia', lat: 40.777, lon: -73.874, feeds: { Tower: 'klga_twr', Ground: 'klga_gnd', Approach: 'klga_app' } },
-  KBOS: { name: 'Boston', lat: 42.366, lon: -71.010, feeds: { Tower: 'kbos_twr', Ground: 'kbos_gnd', Approach: 'kbos_app' } },
-  KLAX: { name: 'Los Angeles', lat: 33.942, lon: -118.408, feeds: { Tower: 'klax_twr', Ground: 'klax_gnd', Approach: 'klax_app' } },
-  KSFO: { name: 'San Francisco', lat: 37.619, lon: -122.375, feeds: { Tower: 'ksfo_twr', Ground: 'ksfo_gnd', Approach: 'ksfo_app' } },
-  KLAS: { name: 'Las Vegas', lat: 36.084, lon: -115.154, feeds: { Tower: 'klas_twr', Approach: 'klas_app' } },
-  KPHX: { name: 'Phoenix', lat: 33.434, lon: -112.012, feeds: { Tower: 'kphx_twr', Approach: 'kphx_app' } },
-  KSEA: { name: 'Seattle', lat: 47.450, lon: -122.309, feeds: { Tower: 'ksea_twr', Ground: 'ksea_gnd', Approach: 'ksea_app' } },
-  KMIA: { name: 'Miami', lat: 25.795, lon: -80.290, feeds: { Tower: 'kmia_twr', Approach: 'kmia_app' } },
-  KMCO: { name: 'Orlando', lat: 28.429, lon: -81.309, feeds: { Tower: 'kmco_twr', Approach: 'kmco_app' } },
+  KMSP: { name: 'Minneapolis–St Paul', lat: 44.882, lon: -93.222 },
+  KDSM: { name: 'Des Moines', lat: 41.534, lon: -93.663 },
+  KORD: { name: 'Chicago O\'Hare', lat: 41.978, lon: -87.904 },
+  KMDW: { name: 'Chicago Midway', lat: 41.786, lon: -87.752 },
+  KOMA: { name: 'Omaha', lat: 41.303, lon: -95.894 },
+  KMKE: { name: 'Milwaukee', lat: 42.947, lon: -87.897 },
+  KFSD: { name: 'Sioux Falls', lat: 43.582, lon: -96.742 },
+  KMCI: { name: 'Kansas City', lat: 39.298, lon: -94.714 },
+  KSTL: { name: 'St. Louis', lat: 38.749, lon: -90.370 },
+  KDFW: { name: 'Dallas/Fort Worth', lat: 32.897, lon: -97.038 },
+  KDEN: { name: 'Denver', lat: 39.856, lon: -104.674 },
+  KATL: { name: 'Atlanta', lat: 33.637, lon: -84.428 },
+  KJFK: { name: 'New York JFK', lat: 40.641, lon: -73.778 },
+  KLGA: { name: 'New York LaGuardia', lat: 40.777, lon: -73.874 },
+  KBOS: { name: 'Boston', lat: 42.366, lon: -71.010 },
+  KLAX: { name: 'Los Angeles', lat: 33.942, lon: -118.408 },
+  KSFO: { name: 'San Francisco', lat: 37.619, lon: -122.375 },
+  KLAS: { name: 'Las Vegas', lat: 36.084, lon: -115.154 },
+  KPHX: { name: 'Phoenix', lat: 33.434, lon: -112.012 },
+  KSEA: { name: 'Seattle', lat: 47.450, lon: -122.309 },
+  KMIA: { name: 'Miami', lat: 25.795, lon: -80.290 },
+  KMCO: { name: 'Orlando', lat: 28.429, lon: -81.309 },
 };
 const EMERGENCY = { '7500': 'HIJACK', '7600': 'RADIO FAILURE', '7700': 'EMERGENCY' };
 const POLL_MS = 5000;
@@ -295,90 +295,135 @@ function updateFlightCard() {
 /* ===== Radio ===== */
 const audio = $('audio');
 let playing = false;
+const feedCache = {};      // ICAO -> [{mount, title, up, kind}]
+let feeds = [];
+
+/* Read the airport's real feed list from LiveATC (through vercel.json) */
+async function loadFeeds(code) {
+  if (feedCache[code]) return feedCache[code];
+  const out = [];
+  try {
+    const r = await fetch(`/lsearch?icao=${code}`);
+    const html = await r.text();
+    const re = /(?:\/play\/|mount=)([a-z0-9_]+)/gi;
+    const seenM = new Set(); let m;
+    while ((m = re.exec(html))) {
+      const mount = m[1].toLowerCase();
+      if (seenM.has(mount)) continue; seenM.add(mount);
+      const before = html.slice(Math.max(0, m.index - 3000), m.index);
+      const strongs = [...before.matchAll(/<strong>([^<]{3,80})<\/strong>/gi)];
+      const title = strongs.length ? strongs[strongs.length - 1][1].trim() : mount;
+      const statusM = [...before.matchAll(/Feed Status:[^A-Z]*(UP|DOWN)/gi)];
+      const up = statusM.length ? statusM[statusM.length - 1][1].toUpperCase() === 'UP' : true;
+      out.push({ mount, title, up, kind: kindOf(title) });
+    }
+  } catch (e) {}
+  feedCache[code] = out;
+  return out;
+}
+function kindOf(t) {
+  const k = [];
+  if (/gnd|ground|del|clnc|ramp/i.test(t)) k.push('Ground');
+  if (/twr|tower|ctaf/i.test(t)) k.push('Tower');
+  if (/app|dep|approach|tracon|final|center|ctr/i.test(t)) k.push('Approach');
+  if (/atis/i.test(t) && !k.length) k.push('ATIS');
+  return k;
+}
+function shortTitle(t) { return t.replace(new RegExp('^' + airport + '\\s*', 'i'), '').slice(0, 28) || t; }
+
+function bestFeed(kind) {
+  const live = feeds.filter(f => f.up && !f.kind.includes('ATIS'));
+  const pool = live.length ? live : feeds;
+  return pool.find(f => f.kind.length === 1 && f.kind[0] === kind)
+      || pool.find(f => f.kind.includes(kind))
+      || pool.find(f => !f.kind.includes('ATIS')) || pool[0];
+}
+
+/* Pick the right channel type for the followed plane */
+function kindFor(a, code) {
+  const ap = AIRPORTS[code];
+  const alt = a.alt_baro === 'ground' ? 0 : (a.alt_baro ?? 99999);
+  const d = nmDist(a.lat, a.lon, ap.lat, ap.lon);
+  if (alt === 0 || (alt < 300 && (a.gs ?? 0) < 40)) return 'Ground';
+  if (alt < 3500 && d < 10) return 'Tower';
+  return 'Approach';
+}
 
 function nearestAirport(lat, lon, maxNm) {
   let best = null, bestD = maxNm;
-  for (const [code, a] of Object.entries(AIRPORTS)) {
-    const d = nmDist(lat, lon, a.lat, a.lon);
+  for (const [code, ap] of Object.entries(AIRPORTS)) {
+    const d = nmDist(lat, lon, ap.lat, ap.lon);
     if (d < bestD) { best = code; bestD = d; }
   }
   return best ? { code: best, d: bestD } : null;
 }
 
-/* Pick the right channel for the followed plane, like a pilot would hear it */
-function channelFor(a, code) {
-  const feeds = AIRPORTS[code].feeds;
-  const alt = a.alt_baro === 'ground' ? 0 : (a.alt_baro ?? 99999);
-  const d = nmDist(a.lat, a.lon, AIRPORTS[code].lat, AIRPORTS[code].lon);
-  if (alt === 0 || (alt < 300 && (a.gs ?? 0) < 40)) return feeds.Ground ? 'Ground' : 'Tower';
-  if (alt < 3500 && d < 10) return 'Tower';
-  return feeds.Approach ? 'Approach' : 'Tower';
-}
-
-function autoTune() {
+async function autoTune() {
   if (channel !== 'auto') return;
-  let code = airport, label;
   const p = followed && planes.get(followed);
+  let kind = 'Tower';
   if (p) {
     const near = nearestAirport(p.a.lat, p.a.lon, 60);
-    if (near) { if (near.code !== airport) selectAirport(near.code, true); code = near.code; }
-    label = channelFor(p.a, code);
-  } else {
-    label = 'Tower';
+    if (near && near.code !== airport) await selectAirport(near.code, true);
+    kind = kindFor(p.a, airport);
   }
-  setFeed(AIRPORTS[code].feeds[label], label, true);
+  const f = bestFeed(kind);
+  if (f) setFeed(f, true);
 }
 
-function setFeed(feedId, label, isAuto) {
-  $('chanText').textContent = `${airport} ${label}${isAuto ? ' · Auto' : ''}`;
-  if (feedId === currentFeed) return;
-  currentFeed = feedId;
+function setFeed(f, isAuto) {
+  $('chanText').textContent = `${shortTitle(f.title)}${isAuto ? ' · Auto' : ''}`;
+  if (f.mount === currentFeed) return;
+  currentFeed = f.mount;
   if (playing) startAudio();
-  else $('radioSub').textContent = 'Tap ▶ to listen';
+  else $('radioSub').textContent = f.up ? 'Tap ▶ to listen' : 'Feed may be down';
 }
 
 function startAudio() {
-  audio.src = `https://d.liveatc.net/${currentFeed}`;
+  if (!currentFeed) return;
+  audio.src = `/atc/${currentFeed}?t=${Date.now()}`;
   $('radioSub').textContent = 'Connecting…';
   audio.play().then(() => {
     playing = true; $('playBtn').classList.add('on'); $('playBtn').textContent = '❚❚'; $('liveDot').classList.add('on');
-    $('radioSub').textContent = `Live · ${currentFeed} · LiveATC`;
-  }).catch(() => { $('radioSub').textContent = `Couldn't play ${currentFeed} — try another channel`; });
+    $('radioSub').textContent = `Live · ${currentFeed} · LiveATC.net`;
+  }).catch(() => { $('radioSub').textContent = `Couldn't play ${currentFeed} — pick another channel`; });
 }
 function stopAudio() {
   audio.pause(); audio.removeAttribute('src'); audio.load();
   playing = false; $('playBtn').classList.remove('on'); $('playBtn').textContent = '▶'; $('liveDot').classList.remove('on');
   $('radioSub').textContent = 'Tap ▶ to listen';
 }
-audio.onerror = () => { if (playing || audio.src) $('radioSub').textContent = `Feed ${currentFeed} offline — try another channel`; };
+audio.onerror = () => { if (audio.getAttribute('src')) $('radioSub').textContent = `${currentFeed} offline — pick another channel`; };
+audio.onended = () => { if (playing) startAudio(); };   // reconnect if the stream drops
 $('playBtn').onclick = () => playing ? stopAudio() : startAudio();
 
 function renderChips() {
   const chips = $('chips'); chips.innerHTML = '';
-  const add = (label, val, cls) => {
+  const add = (label, val, cls, f) => {
     const b = document.createElement('button');
     b.className = 'chip' + (cls ? ' ' + cls : '') + (channel === val ? ' sel' : '');
-    b.textContent = label;
-    b.onclick = () => { channel = val; renderChips(); if (val === 'auto') autoTune(); else setFeed(AIRPORTS[airport].feeds[val], val, false); };
+    b.textContent = label + (f && !f.up ? ' (down)' : '');
+    b.onclick = () => { channel = val; renderChips(); if (val === 'auto') autoTune(); else setFeed(f, false); };
     chips.appendChild(b);
   };
   add('Auto', 'auto', 'auto');
-  for (const label of Object.keys(AIRPORTS[airport].feeds)) add(label, label);
+  for (const f of feeds.filter(f => !f.kind.includes('ATIS') || feeds.length < 4)) add(shortTitle(f.title), f.mount, '', f);
+  if (!feeds.length) { const s = document.createElement('span'); s.className = 'chip'; s.textContent = 'Loading feeds…'; chips.appendChild(s); }
 }
 
 /* ===== Airport selection ===== */
-function selectAirport(code, fromAuto) {
+async function selectAirport(code, fromAuto) {
   airport = code;
-  const a = AIRPORTS[code];
-  $('airportBtn').innerHTML = `${code}<small>${a.name}</small>`;
+  const ap = AIRPORTS[code];
+  $('airportBtn').innerHTML = `${code}<small>${ap.name}</small>`;
   $('findFeeds').href = `https://www.liveatc.net/search/?icao=${code}`;
-  if (!a.feeds[channel] && channel !== 'auto') channel = 'auto';
+  feeds = []; if (!fromAuto) channel = 'auto'; renderChips();
+  if (!fromAuto) { unfollow(); map.setView([ap.lat, ap.lon], 10); }
+  feeds = await loadFeeds(code);
+  if (airport !== code) return;
   renderChips();
-  if (!fromAuto) {
-    unfollow();
-    map.setView([a.lat, a.lon], 10);
-    if (channel === 'auto') autoTune(); else setFeed(a.feeds[channel], channel, false);
-  }
+  if (!feeds.length) $('radioSub').textContent = 'No LiveATC feeds found for ' + code;
+  if (!fromAuto) autoTune();
   try { localStorage.setItem('freeatc_airport', code); } catch (e) {}
 }
 
@@ -394,7 +439,7 @@ $('picker').onclick = e => { if (e.target.id === 'picker') $('picker').style.dis
 $('aptSearch').oninput = e => renderAptList(e.target.value);
 $('customGo').onclick = () => {
   const id = $('customFeed').value.trim(); if (!id) return;
-  channel = 'custom'; renderChips(); currentFeed = null; setFeed(id, id, false); $('picker').style.display = 'none'; startAudio();
+  channel = 'custom'; renderChips(); currentFeed = null; setFeed({ mount: id, title: id, up: true, kind: [] }, false); $('picker').style.display = 'none'; startAudio();
 };
 
 /* ===== Start ===== */

@@ -1,6 +1,8 @@
 {
   "rewrites": [
     { "source": "/adsb/:path*", "destination": "https://api.adsb.lol/:path*" },
-    { "source": "/alive/:path*", "destination": "https://api.airplanes.live/:path*" }
+    { "source": "/alive/:path*", "destination": "https://api.airplanes.live/:path*" },
+    { "source": "/lsearch", "destination": "https://www.liveatc.net/search/" },
+    { "source": "/atc/:mount", "destination": "http://d.liveatc.net/:mount" }
   ]
 }
