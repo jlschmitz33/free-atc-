@@ -121,7 +121,7 @@ window.stopFollow = stopFollow;
 /* Free, no-key ADS-B sources (same readsb format). Converted to the
    state-array layout the rest of the code uses:
    [icao, callsign, info, -, -, lon, lat, baroAlt(m), onGround, speed(m/s), track, vRate(m/s), -, geoAlt(m), squawk] */
-/* Aircraft come from /api/planes (Vercel function) to avoid browser blocking. */
+/* Aircraft come through vercel.json rewrites to avoid browser blocking. */
 
 function toState(a) {
   const ground = a.alt_baro === 'ground';
@@ -138,9 +138,14 @@ async function refresh() {
   const nm = Math.min(250, Math.ceil(c.distanceTo(map.getBounds().getNorthEast()) / 1852));
   const status = document.getElementById('status');
   try {
-    const res = await fetch(`/api/planes?lat=${c.lat.toFixed(3)}&lon=${c.lng.toFixed(3)}&nm=${nm}`);
-    if (!res.ok) throw new Error('server ' + res.status);
-    const data = await res.json();
+    // Same-site paths, proxied by vercel.json (no API folder needed)
+    const lat = c.lat.toFixed(3), lon = c.lng.toFixed(3);
+    const urls = [`/adsb/v2/point/${lat}/${lon}/${nm}`, `/alive/v2/point/${lat}/${lon}/${nm}`];
+    let data;
+    for (const u of urls) {
+      try { const r = await fetch(u); if (r.ok) { data = await r.json(); break; } } catch (e) {}
+    }
+    if (!data) throw new Error('feeds unreachable – is vercel.json uploaded?');
     const states = (data.ac || data.aircraft || []).filter(a => a.lat != null && a.lon != null).map(toState).slice(0, MAX_PLANES);
     const seen = new Set();
     for (const s of states) {
