@@ -77,6 +77,11 @@
   .lbl { background: rgba(10,15,26,.85) !important; border: none !important; color: #e8edf6 !important; font-size: 10px !important;
          padding: 1px 4px !important; border-radius: 4px !important; box-shadow: none !important; }
   .lbl::before { display: none; }
+  #player { display: none; margin-top: 10px; }
+  .pwrap { height: 240px; overflow: hidden; border-radius: 12px; background: #fff; position: relative; }
+  #lframe { border: 0; width: 540px; height: 700px; transform-origin: 0 0; position: absolute; top: 0; left: 0; }
+  .pnote { font-size: 11px; color: var(--dim); margin-top: 6px; }
+  .pnote a { color: #60a5fa; }
   .aptMarker { width: 10px; height: 10px; border: 2px solid #60a5fa; border-radius: 50%; background: #0a0f1a; }
 </style>
 </head>
@@ -114,45 +119,43 @@
   </div>
   <div id="chips"></div>
   <div id="status">Loading…</div>
-  <audio id="audio" preload="none"></audio>
+  <div id="player">
+    <div class="pwrap"><iframe id="lframe" title="LiveATC player" allow="autoplay"></iframe></div>
+    <div class="pnote">Tap <b>Play</b> in the player · audio by LiveATC.net · <a id="openExt" target="_blank">open full player ↗</a></div>
+  </div>
 </div>
 
 <div id="picker"><div id="pickerBox">
-  <input id="aptSearch" placeholder="Search airport (e.g. KORD)">
+  <input id="aptSearch" placeholder="Search 900+ airports (code or city)">
   <div id="aptList"></div>
-  <div style="margin-top:14px;font-size:13px;color:var(--dim)">Add a feed: open "Find feeds", long-press a <b>Listen</b> link, Copy Link, paste here.</div>
-  <div class="feedRow"><input id="customFeed" placeholder="Paste LiveATC Listen link">
-    <select id="customKind" class="chip"><option>Tower</option><option>Ground</option><option>Approach</option><option>ATIS</option></select></div>
-  <div class="feedRow"><button class="chip sel" id="customGo">Save feed</button><button class="chip" id="clearFeeds">Clear this airport</button></div>
-  <div style="margin-top:8px"><a id="findFeeds" target="_blank" style="color:#60a5fa;font-size:13px">Find feeds on LiveATC ↗</a></div>
-</div></div>
+  </div></div>
 
 <script>
-/* ===== Airports & LiveATC feed ids ===== */
-const AIRPORTS = {
-  KMSP: { name: 'Minneapolis–St Paul', lat: 44.882, lon: -93.222 },
-  KDSM: { name: 'Des Moines', lat: 41.534, lon: -93.663 },
-  KORD: { name: 'Chicago O\'Hare', lat: 41.978, lon: -87.904 },
-  KMDW: { name: 'Chicago Midway', lat: 41.786, lon: -87.752 },
-  KOMA: { name: 'Omaha', lat: 41.303, lon: -95.894 },
-  KMKE: { name: 'Milwaukee', lat: 42.947, lon: -87.897 },
-  KFSD: { name: 'Sioux Falls', lat: 43.582, lon: -96.742 },
-  KMCI: { name: 'Kansas City', lat: 39.298, lon: -94.714 },
-  KSTL: { name: 'St. Louis', lat: 38.749, lon: -90.370 },
-  KDFW: { name: 'Dallas/Fort Worth', lat: 32.897, lon: -97.038 },
-  KDEN: { name: 'Denver', lat: 39.856, lon: -104.674 },
-  KATL: { name: 'Atlanta', lat: 33.637, lon: -84.428 },
-  KJFK: { name: 'New York JFK', lat: 40.641, lon: -73.778 },
-  KLGA: { name: 'New York LaGuardia', lat: 40.777, lon: -73.874 },
-  KBOS: { name: 'Boston', lat: 42.366, lon: -71.010 },
-  KLAX: { name: 'Los Angeles', lat: 33.942, lon: -118.408 },
-  KSFO: { name: 'San Francisco', lat: 37.619, lon: -122.375 },
-  KLAS: { name: 'Las Vegas', lat: 36.084, lon: -115.154 },
-  KPHX: { name: 'Phoenix', lat: 33.434, lon: -112.012 },
-  KSEA: { name: 'Seattle', lat: 47.450, lon: -122.309 },
-  KMIA: { name: 'Miami', lat: 25.795, lon: -80.290 },
-  KMCO: { name: 'Orlando', lat: 28.429, lon: -81.309 },
-};
+/* ===== Airports & feeds: loaded from a public LiveATC feed catalog (900+ airports) ===== */
+let AIRPORTS = { KMSP: { name: 'Minneapolis', full: 'Minneapolis-St Paul', lat: 44.88, lon: -93.222, feeds: [] } };
+async function loadCatalog() {
+  const sources = ['https://whiskeytuesday.github.io/omarchy-liveatc-feeds/stations.json', '/stations.json'];
+  for (const u of sources) {
+    try {
+      const r = await fetch(u); if (!r.ok) continue;
+      const d = await r.json();
+      const out = {};
+      for (const st of d.stations || []) {
+        if (!st.feeds || !st.feeds.length || st.lat == null) continue;
+        out[st.icao] = { name: st.city || st.name, full: st.name, lat: st.lat, lon: st.lon,
+          feeds: st.feeds.map(f => ({ mount: f.mount, title: f.name, up: f.status !== 'down', kind: kindOf(f.name) })) };
+      }
+      if (Object.keys(out).length) { AIRPORTS = out; return; }
+    } catch (e) {}
+  }
+}
+function kindOf(t) {
+  if (/atis|guard|emerg|meter|volmet/i.test(t)) return 'Other';
+  if (/gnd|ground|del|clearance|ramp/i.test(t)) return 'Ground';
+  if (/tower|twr|ctaf/i.test(t)) return 'Tower';
+  if (/app|approach|dep|departure|center|ctr|tracon|radar|final/i.test(t)) return 'Approach';
+  return 'Other';
+}
 const EMERGENCY = { '7500': 'HIJACK', '7600': 'RADIO FAILURE', '7700': 'EMERGENCY' };
 const POLL_MS = 5000;
 
@@ -170,10 +173,14 @@ L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_D
   attribution: 'Esri | adsb.lol | LiveATC.net', maxZoom: 16 }).addTo(map);
 L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', { maxZoom: 16 }).addTo(map);
 
-for (const [code, a] of Object.entries(AIRPORTS)) {
-  L.marker([a.lat, a.lon], { icon: L.divIcon({ className: '', html: '<div class="aptMarker"></div>', iconSize: [10, 10] }) })
-    .addTo(map).bindTooltip(code, { direction: 'right', className: 'lbl', permanent: false })
-    .on('click', () => selectAirport(code));
+const aptLayer = L.layerGroup().addTo(map);
+function drawAirports() {
+  aptLayer.clearLayers();
+  for (const [code, ap] of Object.entries(AIRPORTS)) {
+    L.marker([ap.lat, ap.lon], { icon: L.divIcon({ className: '', html: '<div class="aptMarker"></div>', iconSize: [10, 10] }) })
+      .addTo(aptLayer).bindTooltip(code, { direction: 'right', className: 'lbl' })
+      .on('click', () => selectAirport(code));
+  }
 }
 
 function planeSvg(color) {
@@ -294,26 +301,20 @@ function updateFlightCard() {
   $('fRoute').href = `https://www.flightaware.com/live/flight/${cs}`;
 }
 
-/* ===== Radio =====
-   Audio plays in LiveATC's own player (their terms prohibit third-party use of the streams).
-   Feeds are saved per airport on this phone. Add one by pasting a LiveATC "Listen" link. */
-const SEED_FEEDS = { KMSP: [{ kind: 'Approach', mount: 'kmsp1_app_134700' }] };
-let playing = false;
+/* ===== Radio: LiveATC's own player, embedded in the page ===== */
 let feeds = [];
-
-function loadSaved() {
-  try { return JSON.parse(localStorage.getItem('freeatc_feeds')) || SEED_FEEDS; } catch (e) { return SEED_FEEDS; }
-}
-function saveAll(all) { try { localStorage.setItem('freeatc_feeds', JSON.stringify(all)); } catch (e) {} }
-function feedsFor(code) { return loadSaved()[code] || []; }
+const frame = $('lframe');
 
 function playerUrl(f) { return `https://www.liveatc.net/hlisten.php?mount=${encodeURIComponent(f.mount)}&icao=${airport.toLowerCase()}`; }
 
 function bestFeed(kind) {
-  return feeds.find(f => f.kind === kind)
-      || (kind === 'Ground' && feeds.find(f => f.kind === 'Tower'))
-      || (kind === 'Tower' && feeds.find(f => f.kind === 'Approach'))
-      || feeds[0];
+  const up = feeds.filter(f => f.up);
+  const pool = up.length ? up : feeds;
+  return pool.find(f => f.kind === kind)
+      || (kind === 'Ground' && pool.find(f => f.kind === 'Tower'))
+      || (kind !== 'Approach' && pool.find(f => f.kind === 'Approach'))
+      || pool.find(f => f.kind === 'Tower')
+      || pool.find(f => f.kind !== 'Other') || pool[0];
 }
 
 function kindFor(a, code) {
@@ -334,110 +335,108 @@ function nearestAirport(lat, lon, maxNm) {
   return best ? { code: best, d: bestD } : null;
 }
 
-async function autoTune() {
+function autoTune() {
   if (channel !== 'auto') return;
   const p = followed && planes.get(followed);
   let kind = 'Tower';
   if (p) {
-    const near = nearestAirport(p.a.lat, p.a.lon, 60);
-    if (near && near.code !== airport) await selectAirport(near.code, true);
+    const near = nearestAirport(p.a.lat, p.a.lon, 50);
+    if (near && near.code !== airport) selectAirport(near.code, true);
     kind = kindFor(p.a, airport);
   }
   const f = bestFeed(kind);
-  if (f) setFeed(f, true, kind);
-  else showNoFeeds();
+  if (f) setFeed(f, true);
+  else { $('chanText').textContent = `${airport} · no LiveATC coverage`; $('radioSub').textContent = 'Pick another airport'; }
 }
 
-function showNoFeeds() {
-  currentFeed = null;
-  $('chanText').textContent = `${airport} · no feeds saved`;
-  $('radioSub').textContent = 'Tap the airport name → Add feed';
-}
-
-function setFeed(f, isAuto, wantKind) {
-  const changed = currentFeed && f.mount !== currentFeed;
+function setFeed(f, isAuto) {
+  $('chanText').textContent = `${f.title}${isAuto ? ' · Auto' : ''}`;
+  $('radioSub').textContent = f.up ? `${f.mount} · LiveATC.net` : `${f.mount} · feed reported down`;
+  if (f.mount === currentFeed) return;
   currentFeed = f.mount;
-  $('chanText').textContent = `${airport} ${f.kind}${isAuto ? ' · Auto' : ''}`;
-  if (playing && changed) {
-    $('radioSub').textContent = `Plane moved to ${f.kind} — tap ▶ to switch`;
-    $('playBtn').classList.remove('on'); $('playBtn').textContent = '▶';
-  } else if (!playing) {
-    $('radioSub').textContent = wantKind && wantKind !== f.kind ? `No ${wantKind} feed saved — using ${f.kind}` : 'Tap ▶ to listen (opens LiveATC player)';
-  }
+  renderChips();
+  if (radioOpen) { frame.src = playerUrl(f); $('openExt').href = playerUrl(f); }
 }
 
-function startAudio() {
-  const f = feeds.find(x => x.mount === currentFeed);
-  if (!f) { $('picker').style.display = 'block'; renderAptList(''); return; }
-  window.open(playerUrl(f), 'liveatc');
-  playing = true;
-  $('playBtn').classList.add('on'); $('playBtn').textContent = '♪'; $('liveDot').classList.add('on');
-  $('radioSub').textContent = `Playing in LiveATC tab · ${f.mount}`;
+let radioOpen = false;
+function openRadio() {
+  const f = feeds.find(x => x.mount === currentFeed); if (!f) return;
+  radioOpen = true;
+  $('player').style.display = 'block';
+  frame.src = playerUrl(f);
+  $('openExt').href = playerUrl(f);
+  $('playBtn').classList.add('on'); $('playBtn').textContent = '▾'; $('liveDot').classList.add('on');
+  fitFrame();
 }
-$('playBtn').onclick = startAudio;
+function closeRadio() {
+  radioOpen = false; frame.src = 'about:blank';
+  $('player').style.display = 'none';
+  $('playBtn').classList.remove('on'); $('playBtn').textContent = '▶'; $('liveDot').classList.remove('on');
+}
+$('playBtn').onclick = () => radioOpen ? closeRadio() : openRadio();
+
+function fitFrame() {
+  const wrap = document.querySelector('.pwrap'); const w = wrap.clientWidth || 360;
+  const sc = Math.min(1, w / 540);
+  frame.style.transform = `scale(${sc})`;
+  wrap.style.height = Math.round(250 * sc) + 'px';
+}
+window.addEventListener('resize', fitFrame);
 
 function renderChips() {
   const chips = $('chips'); chips.innerHTML = '';
   const add = (label, val, cls, f) => {
     const b = document.createElement('button');
-    b.className = 'chip' + (cls ? ' ' + cls : '') + (channel === val ? ' sel' : '');
+    const sel = channel === val || (val !== 'auto' && f && f.mount === currentFeed);
+    b.className = 'chip' + (cls ? ' ' + cls : '') + (sel ? ' sel' : '');
     b.textContent = label;
-    b.onclick = () => { channel = val; renderChips(); if (val === 'auto') autoTune(); else setFeed(f, false); };
+    b.onclick = () => { channel = val; if (val === 'auto') autoTune(); else setFeed(f, false); renderChips(); };
     chips.appendChild(b);
   };
   add('Auto', 'auto', 'auto');
-  for (const f of feeds) add(f.kind, f.mount, '', f);
-  const plus = document.createElement('button');
-  plus.className = 'chip'; plus.textContent = '+ Add feed';
-  plus.onclick = () => { renderAptList(''); $('picker').style.display = 'block'; $('customFeed').focus(); };
-  chips.appendChild(plus);
+  const order = { Tower: 0, Ground: 1, Approach: 2, Other: 3 };
+  for (const f of [...feeds].sort((x, y) => order[x.kind] - order[y.kind]))
+    add(f.title.replace(new RegExp('^' + airport + '\\s*', 'i'), '') + (f.up ? '' : ' ✕'), f.mount, '', f);
 }
 
 /* ===== Airport selection ===== */
-async function selectAirport(code, fromAuto) {
+function selectAirport(code, fromAuto) {
+  if (!AIRPORTS[code]) return;
   airport = code;
   const ap = AIRPORTS[code];
   $('airportBtn').innerHTML = `${code}<small>${ap.name}</small>`;
-  $('findFeeds').href = `https://www.liveatc.net/search/?icao=${code}`;
-  feeds = feedsFor(code);
+  feeds = ap.feeds;
   if (!fromAuto) { channel = 'auto'; unfollow(); map.setView([ap.lat, ap.lon], 10); }
+  currentFeed = null;
   renderChips();
   if (!fromAuto) autoTune();
   try { localStorage.setItem('freeatc_airport', code); } catch (e) {}
 }
 
 function renderAptList(q) {
-  q = (q || '').toUpperCase();
-  $('aptList').innerHTML = Object.entries(AIRPORTS)
-    .filter(([c, a]) => !q || c.includes(q) || a.name.toUpperCase().includes(q))
-    .map(([c, a]) => `<div class="apt" data-c="${c}"><b>${c}</b> <small>${a.name}</small></div>`).join('');
+  q = (q || '').toUpperCase().trim();
+  const c = map.getCenter();
+  let list = Object.entries(AIRPORTS)
+    .filter(([code, ap]) => !q || code.includes(q) || (ap.name + ' ' + ap.full).toUpperCase().includes(q))
+    .map(([code, ap]) => [code, ap, nmDist(c.lat, c.lng, ap.lat, ap.lon)])
+    .sort((x, y) => x[2] - y[2]).slice(0, 40);
+  $('aptList').innerHTML = list.map(([code, ap, d]) =>
+    `<div class="apt" data-c="${code}"><b>${code}</b> <small>${ap.full} · ${ap.feeds.length} feeds · ${Math.round(d)} nm</small></div>`).join('');
   for (const el of $('aptList').children) el.onclick = () => { $('picker').style.display = 'none'; selectAirport(el.dataset.c); };
 }
 $('airportBtn').onclick = () => { renderAptList(''); $('aptSearch').value = ''; $('picker').style.display = 'block'; };
 $('picker').onclick = e => { if (e.target.id === 'picker') $('picker').style.display = 'none'; };
 $('aptSearch').oninput = e => renderAptList(e.target.value);
-$('customGo').onclick = () => {
-  const txt = $('customFeed').value.trim(); if (!txt) return;
-  const m = txt.match(/mount=([a-z0-9_]+)/i) || txt.match(/\/play\/([a-z0-9_]+)\.pls/i) || txt.match(/^([a-z0-9_]+)$/i);
-  if (!m) { $('customFeed').value = ''; $('customFeed').placeholder = "Couldn't read that link — try again"; return; }
-  const icaoM = txt.match(/icao=([a-z0-9]{3,4})/i);
-  const code = icaoM && AIRPORTS[icaoM[1].toUpperCase()] ? icaoM[1].toUpperCase() : airport;
-  const all = loadSaved();
-  all[code] = (all[code] || []).filter(f => f.mount !== m[1].toLowerCase());
-  all[code].push({ kind: $('customKind').value, mount: m[1].toLowerCase() });
-  saveAll(all);
-  $('customFeed').value = '';
-  $('picker').style.display = 'none';
-  selectAirport(code);
-};
-$('clearFeeds').onclick = () => { const all = loadSaved(); delete all[airport]; saveAll(all); selectAirport(airport); $('picker').style.display = 'none'; };
-
 /* ===== Start ===== */
-let saved; try { saved = localStorage.getItem('freeatc_airport'); } catch (e) {}
-selectAirport(AIRPORTS[saved] ? saved : 'KMSP');
-let moveT; map.on('moveend', () => { clearTimeout(moveT); moveT = setTimeout(poll, 500); });
-poll();
-setInterval(poll, POLL_MS);
+(async () => {
+  await loadCatalog();
+  drawAirports();
+  let saved; try { saved = localStorage.getItem('freeatc_airport'); } catch (e) {}
+  selectAirport(AIRPORTS[saved] ? saved : (AIRPORTS.KMSP ? 'KMSP' : Object.keys(AIRPORTS)[0]));
+  let moveT; map.on('moveend', () => { clearTimeout(moveT); moveT = setTimeout(poll, 500); });
+  poll();
+  setInterval(poll, POLL_MS);
+})();
 </script>
 </body>
 </html>
