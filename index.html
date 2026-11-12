@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Free ATC – Live Radar + Radio</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  html, body { height: 100%; margin: 0; font-family: system-ui, sans-serif; background: #0b1220; color: #e5e7eb; }
+  #map { position: absolute; inset: 0 0 150px 0; }
+  #panel {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 150px; box-sizing: border-box;
+    padding: 10px 12px; background: #111827; border-top: 1px solid #1f2937;
+    display: flex; flex-direction: column; gap: 8px; font-size: 14px;
+  }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  select, input, button {
+    font-size: 14px; padding: 6px 8px; border-radius: 8px; border: 1px solid #374151;
+    background: #0b1220; color: #fff;
+  }
+  button { background: #2563eb; border: none; cursor: pointer; }
+  button.secondary { background: #374151; }
+  #feed { width: 120px; }
+  #status { color: #9ca3af; font-size: 12px; }
+  a { color: #60a5fa; }
+  #follow { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 1000;
+    background: rgba(17,24,39,.92); padding: 6px 12px; border-radius: 8px; display: none; font-size: 14px; }
+  .plane { font-size: 20px; line-height: 20px; color: #facc15; text-shadow: 0 0 3px #000; }
+  .plane.ground { color: #9ca3af; }
+  .plane.followed { color: #22d3ee; font-size: 26px; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="follow"></div>
+
+<div id="panel">
+  <div class="row">
+    <select id="airport"></select>
+    <select id="channel"></select>
+  </div>
+  <div class="row">
+    <input id="feed" placeholder="feed id">
+    <button id="play">▶ Play</button>
+    <button id="stop" class="secondary">■ Stop</button>
+    <a id="lookup" target="_blank" href="#">Find feeds</a>
+  </div>
+  <div id="status">Loading aircraft…</div>
+  <audio id="audio" preload="none"></audio>
+</div>
+
+<script>
+/* ---------- Airports & LiveATC feed IDs ----------
+   Feed IDs are the stream names LiveATC uses (e.g. "kord_twr").
+   If one doesn't play: tap "Find feeds", open the airport on LiveATC,
+   and copy the name from the .pls link (liveatc.net/play/XXXX.pls -> XXXX). */
+const AIRPORTS = {
+  KMSP: { name: 'Minneapolis', lat: 44.882, lon: -93.222, feeds: { Tower: 'kmsp_twr', Approach: 'kmsp_app', Ground: 'kmsp_gnd' } },
+  KORD: { name: 'Chicago O\'Hare', lat: 41.978, lon: -87.904, feeds: { Tower: 'kord_twr', Approach: 'kord_app', Ground: 'kord_gnd' } },
+  KDSM: { name: 'Des Moines', lat: 41.534, lon: -93.663, feeds: { Tower: 'kdsm_twr', Approach: 'kdsm_app' } },
+  KOMA: { name: 'Omaha', lat: 41.303, lon: -95.894, feeds: { Tower: 'koma_twr', Approach: 'koma_app' } },
+  KMKE: { name: 'Milwaukee', lat: 42.947, lon: -87.897, feeds: { Tower: 'kmke_twr', Approach: 'kmke_app' } },
+  KDFW: { name: 'Dallas/Fort Worth', lat: 32.897, lon: -97.038, feeds: { Tower: 'kdfw_twr', Approach: 'kdfw_app' } },
+  KATL: { name: 'Atlanta', lat: 33.637, lon: -84.428, feeds: { Tower: 'katl_twr', Approach: 'katl_app' } },
+  KJFK: { name: 'New York JFK', lat: 40.641, lon: -73.778, feeds: { Tower: 'kjfk_twr', Approach: 'kjfk_app', Ground: 'kjfk_gnd' } },
+  KLAX: { name: 'Los Angeles', lat: 33.942, lon: -118.408, feeds: { Tower: 'klax_twr', Approach: 'klax_app' } },
+  KDEN: { name: 'Denver', lat: 39.856, lon: -104.674, feeds: { Tower: 'kden_twr', Approach: 'kden_app' } },
+};
+
+const REFRESH_MS = 5000;    // free ADS-B feeds, no key needed
+const MAX_PLANES = 1500;
+
+/* ---------- Map ---------- */
+const map = L.map('map').setView([44.882, -93.222], 9);
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+  attribution: 'Tiles &copy; Esri | Aircraft: adsb.lol / airplanes.live / adsb.fi | Audio: LiveATC.net',
+  maxZoom: 16
+}).addTo(map);
+
+const markers = new Map();     // icao24 -> marker
+const lastState = new Map();   // icao24 -> state array
+let followed = null;           // icao24 being followed
+
+function icon(heading, onGround, isFollowed) {
+  const cls = 'plane' + (onGround ? ' ground' : '') + (isFollowed ? ' followed' : '');
+  return L.divIcon({ className: '', iconSize: [20, 20], iconAnchor: [10, 10],
+    html: `<div class="${cls}" style="transform:rotate(${(heading || 0) - 45}deg)">✈</div>` });
+}
+
+function describe(s) {
+  const cs = (s[1] || '').trim() || s[0];
+  const alt = s[8] ? 'ground' : ((s[13] ?? s[7]) != null ? Math.round((s[13] ?? s[7]) * 3.28084).toLocaleString() + ' ft' : '—');
+  const kt = s[9] != null ? Math.round(s[9] * 1.94384) + ' kt' : '—';
+  const vs = s[11] != null ? Math.round(s[11] * 196.85) : null;
+  const trend = vs == null ? '' : vs > 300 ? ' ↑' : vs < -300 ? ' ↓' : '';
+  return { cs, line: `${cs} · ${alt}${trend} · ${kt} · ${s[2]}` };
+}
+
+function popup(s) {
+  const d = describe(s);
+  return `<b>${d.cs}</b><br>${d.line.split(' · ').slice(1).join('<br>')}<br>
+    Squawk: ${s[14] || '—'}<br>
+    <button onclick="startFollow('${s[0]}')">Follow</button>
+    <a href="https://www.flightaware.com/live/flight/${d.cs}" target="_blank">Route</a>`;
+}
+
+window.startFollow = (icao) => { followed = icao; map.closePopup(); updateFollowBox(); refresh(); };
+function stopFollow() { followed = null; updateFollowBox(); }
+map.on('dragstart', stopFollow);
+
+function updateFollowBox() {
+  const box = document.getElementById('follow');
+  const s = followed && lastState.get(followed);
+  if (!s) { box.style.display = 'none'; return; }
+  box.style.display = 'block';
+  box.innerHTML = `Following ${describe(s).line} &nbsp;<a href="#" onclick="stopFollow();return false">✕</a>`;
+}
+window.stopFollow = stopFollow;
+
+/* Free, no-key ADS-B sources (same readsb format). Converted to the
+   state-array layout the rest of the code uses:
+   [icao, callsign, info, -, -, lon, lat, baroAlt(m), onGround, speed(m/s), track, vRate(m/s), -, geoAlt(m), squawk] */
+/* Aircraft come from /api/planes (Vercel function) to avoid browser blocking. */
+
+function toState(a) {
+  const ground = a.alt_baro === 'ground';
+  const ft = ground ? 0 : (typeof a.alt_baro === 'number' ? a.alt_baro : a.alt_geom);
+  const info = [a.t, a.r].filter(Boolean).join(' · ') || 'Unknown type';
+  return [a.hex, a.flight || '', info, null, null, a.lon, a.lat,
+    ft != null ? ft / 3.28084 : null, ground,
+    a.gs != null ? a.gs / 1.94384 : null, a.track ?? a.true_heading,
+    a.baro_rate != null ? a.baro_rate / 196.85 : null, null, null, a.squawk];
+}
+
+async function refresh() {
+  const c = map.getCenter();
+  const nm = Math.min(250, Math.ceil(c.distanceTo(map.getBounds().getNorthEast()) / 1852));
+  const status = document.getElementById('status');
+  try {
+    const res = await fetch(`/api/planes?lat=${c.lat.toFixed(3)}&lon=${c.lng.toFixed(3)}&nm=${nm}`);
+    if (!res.ok) throw new Error('server ' + res.status);
+    const data = await res.json();
+    const states = (data.ac || data.aircraft || []).filter(a => a.lat != null && a.lon != null).map(toState).slice(0, MAX_PLANES);
+    const seen = new Set();
+    for (const s of states) {
+      const id = s[0]; seen.add(id); lastState.set(id, s);
+      let m = markers.get(id);
+      if (!m) { m = L.marker([s[6], s[5]]).addTo(map); markers.set(id, m); }
+      else m.setLatLng([s[6], s[5]]);
+      m.setIcon(icon(s[10], s[8], id === followed));
+      m.setZIndexOffset(id === followed ? 1000 : 0);
+      m.bindPopup(popup(s));
+    }
+    for (const [id, m] of markers) if (!seen.has(id)) { map.removeLayer(m); markers.delete(id); lastState.delete(id); }
+    if (followed && lastState.has(followed)) {
+      const s = lastState.get(followed);
+      map.panTo([s[6], s[5]], { animate: true });
+    }
+    updateFollowBox();
+    status.textContent = `${states.length} aircraft · updated ${new Date().toLocaleTimeString()}` + audioNote;
+  } catch (e) {
+    status.textContent = 'Aircraft error: ' + e.message;
+  }
+}
+
+let moveTimer;
+map.on('moveend', () => { if (!followed) { clearTimeout(moveTimer); moveTimer = setTimeout(refresh, 600); } });
+
+/* ---------- Radio ---------- */
+const airportSel = document.getElementById('airport');
+const channelSel = document.getElementById('channel');
+const feedInput = document.getElementById('feed');
+const audio = document.getElementById('audio');
+let audioNote = '';
+
+for (const [code, a] of Object.entries(AIRPORTS)) {
+  airportSel.add(new Option(`${code} – ${a.name}`, code));
+}
+
+function loadChannels() {
+  const a = AIRPORTS[airportSel.value];
+  channelSel.innerHTML = '';
+  for (const [label, id] of Object.entries(a.feeds)) channelSel.add(new Option(label, id));
+  feedInput.value = channelSel.value;
+  document.getElementById('lookup').href = `https://www.liveatc.net/search/?icao=${airportSel.value}`;
+  stopFollow();
+  map.setView([a.lat, a.lon], 10);
+}
+
+airportSel.onchange = loadChannels;
+channelSel.onchange = () => { feedInput.value = channelSel.value; if (!audio.paused) play(); };
+
+function play() {
+  const id = feedInput.value.trim();
+  if (!id) return;
+  audio.src = `https://d.liveatc.net/${id}`;
+  audio.play().then(() => {
+    audioNote = ` · 🔊 ${id}`;
+  }).catch(err => {
+    audioNote = ` · audio failed (${id}) – try "Find feeds"`;
+  });
+}
+audio.onerror = () => { audioNote = ` · feed "${feedInput.value}" not found – try "Find feeds"`; };
+
+document.getElementById('play').onclick = play;
+document.getElementById('stop').onclick = () => { audio.pause(); audio.removeAttribute('src'); audio.load(); audioNote = ''; };
+
+/* ---------- Start ---------- */
+loadChannels();
+refresh();
+setInterval(refresh, REFRESH_MS);
+</script>
+</body>
+</html>
